@@ -7,6 +7,8 @@ import {
   expensesByVehicle,
   topTollLocations,
   getVehicleDisplayNames,
+  locationBreakdown,
+  travelBehaviorSummary,
 } from './utils/analysis'
 import { getPlazaDisplayName } from './data/tollPlazas'
 import { format, isSameDay, parseISO } from 'date-fns'
@@ -70,6 +72,9 @@ export default function App() {
   const [vehicleTags, setVehicleTags] = useState('')
   const [hasAnalyzed, setHasAnalyzed] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
+  const [avgMilesPerTrip, setAvgMilesPerTrip] = useState('')
+  const [mpg, setMpg] = useState('')
+  const [gasPricePerGallon, setGasPricePerGallon] = useState('')
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0]
@@ -142,6 +147,37 @@ export default function App() {
     const d = typeof selectedDay === 'string' ? parseISO(selectedDay) : selectedDay
     return displayRows.filter((r) => r.date && isSameDay(r.date, d))
   }, [selectedDay, displayRows])
+
+  const selectedDayLocationBreakdown = useMemo(
+    () => locationBreakdown(selectedDayRows, 20),
+    [selectedDayRows]
+  )
+  const travelSummary = useMemo(
+    () =>
+      travelBehaviorSummary(
+        displayRows,
+        period,
+        periodDate,
+        period === 'custom' ? startDate : null,
+        period === 'custom' ? endDate : null
+      ),
+    [displayRows, period, periodDate, startDate, endDate]
+  )
+  const gasEstimate = useMemo(() => {
+    const miles = parseFloat(avgMilesPerTrip)
+    const m = parseFloat(mpg)
+    const price = parseFloat(gasPricePerGallon)
+    if (!Number.isFinite(miles) || miles <= 0 || !Number.isFinite(m) || m <= 0 || !Number.isFinite(price) || price < 0) {
+      return null
+    }
+    const totalTrips = travelSummary.totalTrips
+    const totalMiles = totalTrips * miles
+    const gallons = totalMiles / m
+    const cost = gallons * price
+    const weeklyCost =
+      travelSummary.weeksInPeriod > 0 ? (cost / travelSummary.weeksInPeriod) : 0
+    return { totalMiles, gallons, cost, weeklyCost }
+  }, [avgMilesPerTrip, mpg, gasPricePerGallon, travelSummary.totalTrips, travelSummary.weeksInPeriod])
 
   const runAnalysis = () => setHasAnalyzed(true)
 
@@ -315,6 +351,91 @@ export default function App() {
               <span className="total-value">${totalExpenses.toFixed(2)}</span>
             </div>
 
+            <div className="travel-summary-block">
+              <h3 className="chart-title">Travel behavior summary</h3>
+              <p className="travel-summary-desc">
+                {displayRows.length === 0
+                  ? 'Upload data and run Analyze to see your travel behavior.'
+                  : (() => {
+                      const w = travelSummary.weeksInPeriod
+                      const avg = travelSummary.avgWeeklyTrips
+                      const top = travelSummary.topLocationNames
+                        .slice(0, 3)
+                        .map((loc) => getPlazaDisplayName(loc))
+                        .join(', ')
+                      const busiest =
+                        travelSummary.weekdayCounts &&
+                        Object.entries(travelSummary.weekdayCounts).sort((a, b) => b[1] - a[1])[0]
+                      return (
+                        <>
+                          <strong>Regular travels:</strong> You had{' '}
+                          <strong>{travelSummary.totalTrips.toLocaleString()} toll trip(s)</strong> over ~
+                          {w.toFixed(1)} weeks, about <strong>{avg.toFixed(1)} trips per week</strong> on
+                          average.
+                          {top ? ` Most used locations: ${top}.` : ''}
+                          {busiest && busiest[1] > 0
+                            ? ` Most trips fall on ${busiest[0]}s.`
+                            : ''}
+                        </>
+                      )
+                    })()}
+              </p>
+            </div>
+
+            <div className="gas-estimate-block">
+              <h3 className="chart-title">Gas estimate for toll trips</h3>
+              <p className="gas-estimate-desc">
+                Enter your average miles per toll trip, vehicle MPG, and gas price to estimate fuel cost for
+                these trips.
+              </p>
+              <div className="gas-inputs">
+                <label>
+                  <span>Avg miles per toll trip</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="e.g. 25"
+                    value={avgMilesPerTrip}
+                    onChange={(e) => setAvgMilesPerTrip(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>MPG</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 28"
+                    value={mpg}
+                    onChange={(e) => setMpg(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Gas price ($/gal)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 3.50"
+                    value={gasPricePerGallon}
+                    onChange={(e) => setGasPricePerGallon(e.target.value)}
+                  />
+                </label>
+              </div>
+              {gasEstimate && (
+                <div className="gas-result">
+                  <p>
+                    <strong>This period:</strong> ~{gasEstimate.gallons.toFixed(1)} gallons ·{' '}
+                    <strong>${gasEstimate.cost.toFixed(2)}</strong> estimated gas
+                  </p>
+                  <p className="gas-weekly">
+                    <strong>Per week:</strong> ~${gasEstimate.weeklyCost.toFixed(2)}/week
+                  </p>
+                </div>
+              )}
+            </div>
+
             {dailyTrend.length > 0 && (
               <div className="chart-block">
                 <h3 className="chart-title">Daily expense trend (click a point for details)</h3>
@@ -350,7 +471,7 @@ export default function App() {
                 {selectedDay && (
                   <div className="day-details-panel">
                     <div className="day-details-header">
-                      <h4>Transactions for {format(parseISO(selectedDay), 'EEEE, MMM d, yyyy')}</h4>
+                      <h4>Travel details for {format(parseISO(selectedDay), 'EEEE, MMM d, yyyy')}</h4>
                       <button
                         type="button"
                         className="btn-close-details"
@@ -360,6 +481,35 @@ export default function App() {
                         ×
                       </button>
                     </div>
+                    <p className="day-details-trips-summary">
+                      {selectedDayRows.length} toll transaction(s) across {selectedDayLocationBreakdown.length} location(s) · ${selectedDayRows.reduce((s, r) => s + r.amount, 0).toFixed(2)} total
+                    </p>
+                    {selectedDayLocationBreakdown.length > 0 && (
+                      <div className="day-details-location-breakdown">
+                        <h5>Toll location expenses (this day)</h5>
+                        <div className="day-details-table-wrap">
+                          <table className="data-table day-details-table">
+                            <thead>
+                              <tr>
+                                <th>Location</th>
+                                <th>Trips</th>
+                                <th>Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedDayLocationBreakdown.map((row, i) => (
+                                <tr key={i}>
+                                  <td>{getPlazaDisplayName(row.location)}</td>
+                                  <td>{row.count}</td>
+                                  <td>${row.total.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    <h5>Transaction list</h5>
                     <div className="day-details-table-wrap">
                       <table className="data-table day-details-table">
                         <thead>
@@ -390,9 +540,6 @@ export default function App() {
                         </tbody>
                       </table>
                     </div>
-                    <p className="day-details-summary">
-                      {selectedDayRows.length} transaction(s) · ${selectedDayRows.reduce((s, r) => s + r.amount, 0).toFixed(2)} total
-                    </p>
                   </div>
                 )}
               </div>

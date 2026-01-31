@@ -280,6 +280,74 @@
   font-family: var(--font-mono);
 }
 
+/* Travel behavior summary */
+.travel-summary-block {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.travel-summary-desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* Gas estimate */
+.gas-estimate-block {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.gas-estimate-desc {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.gas-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.gas-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.gas-inputs input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+}
+
+.gas-result {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.gas-result p {
+  margin: 0.25rem 0;
+}
+
+.gas-weekly {
+  color: var(--text-muted);
+}
+
 .chart-block {
   margin-bottom: 1.5rem;
 }
@@ -382,6 +450,30 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.day-details-trips-summary {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.day-details-location-breakdown {
+  margin-bottom: 1rem;
+}
+
+.day-details-location-breakdown h5,
+.day-details-panel h5 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.day-details-panel h5:first-of-type {
+  margin-top: 0;
 }
 
 .btn-close-details {
