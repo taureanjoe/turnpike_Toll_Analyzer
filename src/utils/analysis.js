@@ -81,21 +81,35 @@ export function dailyExpenseTrend(rows) {
 
 /**
  * Expenses by vehicle (transponder): array of { name, total, count, percent }
+ * name is the raw transponder id (or empty string when missing).
  */
 export function expensesByVehicle(rows) {
   const byVehicle = new Map()
   let total = 0
   for (const r of rows) {
-    const name = r.transponder || 'Unknown'
+    const id = r.transponder != null && String(r.transponder).trim() !== '' ? String(r.transponder).trim() : ''
     total += r.amount
-    if (!byVehicle.has(name)) byVehicle.set(name, { name, total: 0, count: 0 })
-    const entry = byVehicle.get(name)
+    if (!byVehicle.has(id)) byVehicle.set(id, { name: id, total: 0, count: 0 })
+    const entry = byVehicle.get(id)
     entry.total += r.amount
     entry.count += 1
   }
   return Array.from(byVehicle.values())
     .map((e) => ({ ...e, percent: total ? (e.total / total) * 100 : 0 }))
     .sort((a, b) => b.total - a.total)
+}
+
+/**
+ * Build a map from transponder id to display label: "Vehicle 1", "Vehicle 2", … or "Unassigned" for empty.
+ */
+export function getVehicleDisplayNames(rows) {
+  const byVehicle = expensesByVehicle(rows)
+  const map = new Map()
+  byVehicle.forEach((v, i) => {
+    const label = v.name === '' ? 'Unassigned' : `Vehicle ${i + 1}`
+    map.set(v.name, label)
+  })
+  return map
 }
 
 /**
