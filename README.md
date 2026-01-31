@@ -34,10 +34,11 @@ The repo is set up to deploy the **main** branch to GitHub Pages.
 
 1. **Enable GitHub Pages:** In your repo on GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 2. **Push main:** Push the `main` branch (or merge your branch into `main` and push). The workflow **Deploy to GitHub Pages** will build and deploy the app.
-3. **Live URL:** After the workflow completes, the app is available at  
-   **https://taureanjoe.github.io/turnpike_Toll_Analyzer/**
+3. **Live URL:** After the workflow completes (check the **Actions** tab), open:  
+   **https://taureanjoe.github.io/turnpike_Toll_Analyzer/**  
+   Use this exact URL (including the repo name). If you see a blank page, wait 1–2 minutes for the deploy to finish, then hard-refresh (Ctrl+Shift+R / Cmd+Shift+R). If it still fails, open DevTools (F12) → Console and check for 404 or script errors.
 
-The Vite `base` is set to `/turnpike_Toll_Analyzer/` so assets load correctly on GitHub Pages. If you rename the repo, update `base` in `vite.config.js` to match (e.g. `'/NewRepoName/'`).
+The app uses relative asset paths (`base: './'`) so it works from any deployment path.
 
 ## File format (CSV or Excel)
 
