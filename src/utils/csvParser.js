@@ -89,11 +89,14 @@ export function parseTurnpikeCsv(csvText) {
     const amount = parseAmount(getVal(row, 'Amount', 'amount'))
     const postingDate = parseDate(getVal(row, 'Posting Date', 'posting date'))
     const exitDate = parseDate(getVal(row, 'Exit Date', 'exit date'))
-    const date = postingDate || exitDate
+    /* Use exit date as when travel actually happened; fall back to posting date if missing */
+    const date = exitDate || postingDate
     const transaction = getVal(row, 'Transaction', 'transaction') || ''
     const transponder = getVal(row, 'Transponder', 'transponder') || ''
     const exitInterchange = getVal(row, 'Exit Interchange', 'exit interchange') || ''
     const vehicleClass = getVal(row, 'Class', 'class') || ''
+    const licenseState = getVal(row, 'License State', 'license state') || ''
+    const licensePlate = getVal(row, 'License Plate', 'license plate', 'License', 'license') || ''
 
     return {
       amount,
@@ -104,6 +107,8 @@ export function parseTurnpikeCsv(csvText) {
       transponder: transponder.trim() || '',
       exitInterchange: exitInterchange.trim() || '—',
       class: vehicleClass,
+      licenseState: licenseState.trim() || '',
+      licensePlate: licensePlate.trim() || '',
       raw: row,
     }
   })

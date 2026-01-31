@@ -296,6 +296,70 @@
   color: var(--text);
 }
 
+.travel-summary-trip-help {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+/* Trips definition (hover/click) */
+.term-with-def {
+  position: relative;
+  display: inline;
+}
+
+.term-trigger {
+  cursor: help;
+  border-bottom: 1px dotted var(--text-muted);
+  text-underline-offset: 2px;
+}
+
+.term-trigger:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.term-popover {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 0.35rem;
+  padding: 0.5rem 1.75rem 0.5rem 0.65rem;
+  max-width: 320px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
+.term-popover-close {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.term-popover-close:hover {
+  color: var(--text);
+  background: var(--surface-alt);
+}
+
 /* Gas estimate */
 .gas-estimate-block {
   margin-bottom: 1.5rem;
@@ -350,6 +414,36 @@
 
 .chart-block {
   margin-bottom: 1.5rem;
+}
+
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.chart-title-row .chart-title {
+  margin: 0;
+}
+
+.btn-reset-filter {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--surface-alt);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-reset-filter:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 .chart-title {
@@ -524,4 +618,56 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 0.15rem;
+}
+
+/* Top locations expandable */
+.locations-table .location-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.locations-table .location-row:hover {
+  background: var(--accent-light);
+}
+
+.locations-table .col-expand {
+  width: 2rem;
+  padding-left: 0.5rem;
+  padding-right: 0;
+  vertical-align: middle;
+}
+
+.expand-icon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.location-details-row {
+  background: var(--surface-alt);
+}
+
+.location-details-cell {
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.location-details-content h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.location-dates-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.location-dates-list li {
+  margin-bottom: 0.2rem;
 }

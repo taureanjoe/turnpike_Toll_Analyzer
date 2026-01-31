@@ -63,6 +63,42 @@ export function filterByTimePeriod(rows, period, startDate, endDate, vehicleTags
 }
 
 /**
+ * Infer journeys from same-day transactions: group by time gap.
+ * If consecutive transactions (by exit time) are > GAP_HOURS apart, start a new journey.
+ * Returns { totalTransactions, totalJourneys, hasTimeData }.
+ */
+const JOURNEY_GAP_HOURS = 2
+
+export function inferJourneys(rows) {
+  const withTime = rows.filter((r) => r.exitDate || r.date)
+  if (withTime.length === 0) return { totalTransactions: rows.length, totalJourneys: rows.length }
+
+  const getTime = (r) => (r.exitDate || r.date).getTime()
+  const byDay = new Map()
+  for (const r of withTime) {
+    const key = format(startOfDay(r.exitDate || r.date), 'yyyy-MM-dd')
+    if (!byDay.has(key)) byDay.set(key, [])
+    byDay.get(key).push(r)
+  }
+
+  let totalJourneys = 0
+  for (const dayRows of byDay.values()) {
+    dayRows.sort((a, b) => getTime(a) - getTime(b))
+    let journeys = 1
+    for (let i = 1; i < dayRows.length; i++) {
+      const gapMs = getTime(dayRows[i]) - getTime(dayRows[i - 1])
+      if (gapMs > JOURNEY_GAP_HOURS * 60 * 60 * 1000) journeys += 1
+    }
+    totalJourneys += journeys
+  }
+
+  return {
+    totalTransactions: rows.length,
+    totalJourneys,
+  }
+}
+
+/**
  * Daily expense trend: array of { date, total, count }
  */
 export function dailyExpenseTrend(rows) {
@@ -125,6 +161,37 @@ export function topTollLocations(rows, limit = 10) {
     entry.total += r.amount
   }
   return Array.from(byLocation.values())
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit)
+}
+
+/**
+ * Per-location trip details: dates when travel occurred and count per date.
+ * Returns array of { location, count, total, dates: [ { dateKey, label, count } ] }.
+ */
+export function topTollLocationsWithDetails(rows, limit = 10) {
+  const byLocation = new Map()
+  for (const r of rows) {
+    const loc = r.exitInterchange || '—'
+    if (!r.date) continue
+    const dateKey = format(startOfDay(r.date), 'yyyy-MM-dd')
+    const label = format(r.date, 'MMM d, yyyy')
+    if (!byLocation.has(loc)) {
+      byLocation.set(loc, { location: loc, count: 0, total: 0, byDate: new Map() })
+    }
+    const entry = byLocation.get(loc)
+    entry.count += 1
+    entry.total += r.amount
+    if (!entry.byDate.has(dateKey)) entry.byDate.set(dateKey, { dateKey, label, count: 0 })
+    entry.byDate.get(dateKey).count += 1
+  }
+  return Array.from(byLocation.values())
+    .map((e) => ({
+      location: e.location,
+      count: e.count,
+      total: e.total,
+      dates: Array.from(e.byDate.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
+    }))
     .sort((a, b) => b.total - a.total)
     .slice(0, limit)
 }

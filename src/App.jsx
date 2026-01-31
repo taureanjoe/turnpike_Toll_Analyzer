@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { parseTurnpikeCsv } from './utils/csvParser'
 import { parseTurnpikeXlsx } from './utils/xlsxParser'
 import {
@@ -6,12 +6,14 @@ import {
   dailyExpenseTrend,
   expensesByVehicle,
   topTollLocations,
+  topTollLocationsWithDetails,
   getVehicleDisplayNames,
   locationBreakdown,
   travelBehaviorSummary,
+  inferJourneys,
 } from './utils/analysis'
 import { getPlazaDisplayName } from './data/tollPlazas'
-import { format, isSameDay, parseISO } from 'date-fns'
+import { format, isSameDay, parseISO, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
 import {
   LineChart,
   Line,
@@ -20,10 +22,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  Brush,
 } from 'recharts'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
@@ -37,7 +36,48 @@ const PERIOD_OPTIONS = [
   { value: 'custom', label: 'Custom range' },
 ]
 
-const CHART_COLORS = ['#0d9488', '#0891b2', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b']
+const TRIPS_DEFINITION =
+  'A trip is one toll transaction—passing one toll point. A single drive can include multiple trips if you pass several toll locations. Inferred journeys group same-day toll passes with short time gaps (under 2 hours), likely one drive.'
+
+function TripsDefinition({ children = 'trips', className = '' }) {
+  const [showPopover, setShowPopover] = useState(false)
+  return (
+    <span className={`term-with-def ${className}`}>
+      <span
+        role="button"
+        tabIndex={0}
+        className="term-trigger"
+        title={TRIPS_DEFINITION}
+        onClick={(e) => {
+          e.preventDefault()
+          setShowPopover((v) => !v)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setShowPopover((v) => !v)
+          }
+        }}
+        onBlur={() => setShowPopover(false)}
+      >
+        {children}
+      </span>
+      {showPopover && (
+        <span className="term-popover" role="tooltip">
+          {TRIPS_DEFINITION}
+          <button
+            type="button"
+            className="term-popover-close"
+            onClick={() => setShowPopover(false)}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </span>
+      )}
+    </span>
+  )
+}
 
 function DailyTrendDot(props) {
   const { cx, cy, payload, onClick } = props
@@ -75,6 +115,9 @@ export default function App() {
   const [avgMilesPerTrip, setAvgMilesPerTrip] = useState('')
   const [mpg, setMpg] = useState('')
   const [gasPricePerGallon, setGasPricePerGallon] = useState('')
+  const [graphDateRange, setGraphDateRange] = useState(null)
+  const [brushKey, setBrushKey] = useState(0)
+  const [expandedLocation, setExpandedLocation] = useState(null)
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0]
@@ -83,6 +126,9 @@ export default function App() {
     setFileName('')
     setRows([])
     setHasAnalyzed(false)
+    setGraphDateRange(null)
+    setExpandedLocation(null)
+    setBrushKey((k) => k + 1)
     if (!f) return
     const isCsv = f.name.toLowerCase().endsWith('.csv')
     const isXlsx = f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls')
@@ -127,7 +173,15 @@ export default function App() {
     return filterByTimePeriod(rows, 'custom', startDate, endDate, includeAllVehicles ? '' : vehicleTags)
   }, [rows, period, startDate, endDate, includeAllVehicles, vehicleTags])
 
-  const displayRows = period === 'custom' ? customFilteredRows : filteredRows
+  const baseRows = period === 'custom' ? customFilteredRows : filteredRows
+  const displayRows = useMemo(() => {
+    if (!graphDateRange) return baseRows
+    const start = startOfDay(parseISO(graphDateRange.start))
+    const end = endOfDay(parseISO(graphDateRange.end))
+    return baseRows.filter((r) => r.date && isWithinInterval(r.date, { start, end }))
+  }, [baseRows, graphDateRange])
+
+  const fullDailyTrend = useMemo(() => dailyExpenseTrend(baseRows), [baseRows])
 
   const totalExpenses = useMemo(() => displayRows.reduce((s, r) => s + r.amount, 0), [displayRows])
   const dailyTrend = useMemo(() => dailyExpenseTrend(displayRows), [displayRows])
@@ -142,6 +196,10 @@ export default function App() {
     [byVehicle, vehicleDisplayNames]
   )
   const topLocations = useMemo(() => topTollLocations(displayRows, 10), [displayRows])
+  const topLocationsWithDetails = useMemo(
+    () => topTollLocationsWithDetails(displayRows, 10),
+    [displayRows]
+  )
   const selectedDayRows = useMemo(() => {
     if (!selectedDay) return []
     const d = typeof selectedDay === 'string' ? parseISO(selectedDay) : selectedDay
@@ -163,6 +221,7 @@ export default function App() {
       ),
     [displayRows, period, periodDate, startDate, endDate]
   )
+  const journeySummary = useMemo(() => inferJourneys(displayRows), [displayRows])
   const gasEstimate = useMemo(() => {
     const miles = parseFloat(avgMilesPerTrip)
     const m = parseFloat(mpg)
@@ -366,12 +425,19 @@ export default function App() {
                       const busiest =
                         travelSummary.weekdayCounts &&
                         Object.entries(travelSummary.weekdayCounts).sort((a, b) => b[1] - a[1])[0]
+                      const useJourneys = journeySummary.totalJourneys !== journeySummary.totalTransactions
+                      const count = useJourneys ? journeySummary.totalJourneys : travelSummary.totalTrips
+                      const avgRate = w > 0 ? count / w : count
                       return (
                         <>
                           <strong>Regular travels:</strong> You had{' '}
-                          <strong>{travelSummary.totalTrips.toLocaleString()} toll trip(s)</strong> over ~
-                          {w.toFixed(1)} weeks, about <strong>{avg.toFixed(1)} trips per week</strong> on
-                          average.
+                          <strong>
+                            {journeySummary.totalTransactions.toLocaleString()} toll transactions
+                            {useJourneys && (
+                              <> in {journeySummary.totalJourneys.toLocaleString()} inferred journeys</>
+                            )}
+                          </strong>
+                          {' '}over ~{w.toFixed(1)} weeks, about <strong>{avgRate.toFixed(1)} {useJourneys ? 'journeys' : <><TripsDefinition>trips</TripsDefinition></>} per week</strong> on average.
                           {top ? ` Most used locations: ${top}.` : ''}
                           {busiest && busiest[1] > 0
                             ? ` Most trips fall on ${busiest[0]}s.`
@@ -380,13 +446,16 @@ export default function App() {
                       )
                     })()}
               </p>
+              <p className="travel-summary-trip-help">
+                <strong>What is a <TripsDefinition>trip</TripsDefinition>?</strong> Hover or click the underlined word for the definition. Inferred journeys group same-day toll passes with short time gaps (under 2 hours), likely one drive.
+              </p>
             </div>
 
             <div className="gas-estimate-block">
               <h3 className="chart-title">Gas estimate for toll trips</h3>
               <p className="gas-estimate-desc">
-                Enter your average miles per toll trip, vehicle MPG, and gas price to estimate fuel cost for
-                these trips.
+                We can&apos;t calculate distance from toll data alone. Enter your average miles per toll trip,
+                vehicle MPG, and gas price to estimate fuel cost for these trips.
               </p>
               <div className="gas-inputs">
                 <label>
@@ -436,12 +505,29 @@ export default function App() {
               )}
             </div>
 
-            {dailyTrend.length > 0 && (
+            {fullDailyTrend.length > 0 && (
               <div className="chart-block">
-                <h3 className="chart-title">Daily expense trend (click a point for details)</h3>
+                <div className="chart-title-row">
+                  <h3 className="chart-title">Daily expense trend (drag to filter range, click a point for day details)</h3>
+                  {graphDateRange && (
+                    <button
+                      type="button"
+                      className="btn btn-reset-filter"
+                      onClick={() => {
+                        setGraphDateRange(null)
+                        setBrushKey((k) => k + 1)
+                      }}
+                    >
+                      Reset filter
+                    </button>
+                  )}
+                </div>
                 <div className="chart-wrap chart-line">
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={dailyTrend} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart
+                      data={fullDailyTrend}
+                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis
                         dataKey="label"
@@ -464,6 +550,29 @@ export default function App() {
                         strokeWidth={2}
                         dot={<DailyTrendDot onClick={setSelectedDay} />}
                         activeDot={{ r: 8, stroke: 'var(--accent-hover)', strokeWidth: 2 }}
+                      />
+                      <Brush
+                        key={brushKey}
+                        dataKey="label"
+                        height={28}
+                        stroke="var(--accent)"
+                        fill="var(--surface-alt)"
+                        travellerWidth={8}
+                        onChange={(brush) => {
+                          const start = brush?.startIndex
+                          const end = brush?.endIndex
+                          if (
+                            start != null &&
+                            end != null &&
+                            fullDailyTrend[start] &&
+                            fullDailyTrend[end]
+                          ) {
+                            setGraphDateRange({
+                              start: fullDailyTrend[start].date,
+                              end: fullDailyTrend[end].date,
+                            })
+                          }
+                        }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -517,6 +626,9 @@ export default function App() {
                             <th>Time</th>
                             <th>Location</th>
                             <th>Vehicle</th>
+                            {selectedDayRows.some((r) => r.licensePlate || r.licenseState) && (
+                              <th>License</th>
+                            )}
                             <th>Amount</th>
                           </tr>
                         </thead>
@@ -534,6 +646,9 @@ export default function App() {
                                 </td>
                                 <td>{getPlazaDisplayName(r.exitInterchange)}</td>
                                 <td>{vehicleDisplayNames.get(r.transponder?.trim() ?? '') ?? 'Unassigned'}</td>
+                                {selectedDayRows.some((row) => row.licensePlate || row.licenseState) && (
+                                  <td>{r.licensePlate || r.licenseState || '—'}</td>
+                                )}
                                 <td>${r.amount.toFixed(2)}</td>
                               </tr>
                             ))}
@@ -547,57 +662,83 @@ export default function App() {
 
             {byVehicleWithLabels.length > 0 && (
               <div className="chart-block">
-                <h3 className="chart-title">Expenses by vehicle</h3>
-                <div className="chart-wrap chart-pie">
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie
-                        data={byVehicleWithLabels}
-                        dataKey="total"
-                        nameKey="displayName"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius="70%"
-                        label={({ displayName, percent }) =>
-                          `${displayName} ${(percent * 100).toFixed(0)}%`
-                        }
-                      >
-                        {byVehicleWithLabels.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => [`$${Number(v).toFixed(2)}`, 'Total']} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {topLocations.length > 0 && (
-              <div className="table-block">
-                <h3 className="chart-title">Top toll locations</h3>
+                <h3 className="chart-title">Transponders used</h3>
                 <div className="table-wrap">
                   <table className="data-table">
                     <thead>
                       <tr>
+                        <th>Transponder</th>
+                        <th>Count</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byVehicleWithLabels.map((v, i) => (
+                        <tr key={i}>
+                          <td>{v.displayName === 'Unassigned' ? '—' : v.name}</td>
+                          <td>{v.count}</td>
+                          <td>${v.total.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {topLocationsWithDetails.length > 0 && (
+              <div className="table-block">
+                <h3 className="chart-title">Top toll locations</h3>
+                <div className="table-wrap">
+                  <table className="data-table locations-table">
+                    <thead>
+                      <tr>
+                        <th className="col-expand"></th>
                         <th>Location</th>
                         <th>Count</th>
                         <th>Total cost</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {topLocations.map((row, i) => (
-                        <tr key={i}>
-                          <td>
-                            <span className="plaza-name">{getPlazaDisplayName(row.location)}</span>
-                            {row.location !== getPlazaDisplayName(row.location) && (
-                              <span className="plaza-code">{row.location}</span>
-                            )}
-                          </td>
-                          <td>{row.count}</td>
-                          <td>${row.total.toFixed(2)}</td>
-                        </tr>
+                      {topLocationsWithDetails.map((row, i) => (
+                        <React.Fragment key={i}>
+                          <tr
+                            className="location-row"
+                            onClick={() =>
+                              setExpandedLocation(expandedLocation === row.location ? null : row.location)
+                            }
+                          >
+                            <td className="col-expand">
+                              <span className="expand-icon" aria-hidden>
+                                {expandedLocation === row.location ? '▼' : '▶'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="plaza-name">{getPlazaDisplayName(row.location)}</span>
+                              {row.location !== getPlazaDisplayName(row.location) && (
+                                <span className="plaza-code">{row.location}</span>
+                              )}
+                            </td>
+                            <td>{row.count}</td>
+                            <td>${row.total.toFixed(2)}</td>
+                          </tr>
+                          {expandedLocation === row.location && (
+                            <tr className="location-details-row">
+                              <td colSpan={4} className="location-details-cell">
+                                <div className="location-details-content">
+                                  <h5>Travel occurred on</h5>
+                                  <ul className="location-dates-list">
+                                    {row.dates.map((d, j) => (
+                                      <li key={j}>
+                                        {d.label}: {d.count} <TripsDefinition>trip{d.count !== 1 ? 's' : ''}</TripsDefinition>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
