@@ -359,3 +359,77 @@
     min-width: 200px;
   }
 }
+
+/* Day details (click on trend) */
+.day-details-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.day-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.day-details-header h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.btn-close-details {
+  padding: 0.25rem 0.5rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.btn-close-details:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.day-details-table-wrap {
+  overflow-x: auto;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.day-details-table {
+  font-size: 0.8125rem;
+}
+
+.day-details-table th,
+.day-details-table td {
+  padding: 0.5rem 0.75rem;
+}
+
+.day-details-summary {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Plaza name + code in table */
+.plaza-name {
+  display: block;
+}
+
+.plaza-code {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}

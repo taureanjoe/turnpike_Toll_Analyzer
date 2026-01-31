@@ -101,7 +101,7 @@ export function parseTurnpikeCsv(csvText) {
       postingDate,
       exitDate,
       transaction,
-      transponder: transponder.trim() || 'Unknown',
+      transponder: transponder.trim() || '',
       exitInterchange: exitInterchange.trim() || '—',
       class: vehicleClass,
       raw: row,

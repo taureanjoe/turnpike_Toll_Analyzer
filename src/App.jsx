@@ -6,8 +6,10 @@ import {
   dailyExpenseTrend,
   expensesByVehicle,
   topTollLocations,
+  getVehicleDisplayNames,
 } from './utils/analysis'
-import { format } from 'date-fns'
+import { getPlazaDisplayName } from './data/tollPlazas'
+import { format, isSameDay, parseISO } from 'date-fns'
 import {
   LineChart,
   Line,
@@ -35,6 +37,26 @@ const PERIOD_OPTIONS = [
 
 const CHART_COLORS = ['#0d9488', '#0891b2', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b']
 
+function DailyTrendDot(props) {
+  const { cx, cy, payload, onClick } = props
+  if (cx == null || cy == null) return null
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={6}
+      fill="var(--accent)"
+      stroke="var(--surface)"
+      strokeWidth={2}
+      style={{ cursor: 'pointer' }}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (payload?.date && onClick) onClick(payload.date)
+      }}
+    />
+  )
+}
+
 export default function App() {
   const [file, setFile] = useState(null)
   const [fileName, setFileName] = useState('')
@@ -47,6 +69,7 @@ export default function App() {
   const [includeAllVehicles, setIncludeAllVehicles] = useState(true)
   const [vehicleTags, setVehicleTags] = useState('')
   const [hasAnalyzed, setHasAnalyzed] = useState(false)
+  const [selectedDay, setSelectedDay] = useState(null)
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0]
@@ -104,7 +127,21 @@ export default function App() {
   const totalExpenses = useMemo(() => displayRows.reduce((s, r) => s + r.amount, 0), [displayRows])
   const dailyTrend = useMemo(() => dailyExpenseTrend(displayRows), [displayRows])
   const byVehicle = useMemo(() => expensesByVehicle(displayRows), [displayRows])
+  const vehicleDisplayNames = useMemo(() => getVehicleDisplayNames(displayRows), [displayRows])
+  const byVehicleWithLabels = useMemo(
+    () =>
+      byVehicle.map((v) => ({
+        ...v,
+        displayName: (vehicleDisplayNames.get(v.name) ?? v.name) || 'Unassigned',
+      })),
+    [byVehicle, vehicleDisplayNames]
+  )
   const topLocations = useMemo(() => topTollLocations(displayRows, 10), [displayRows])
+  const selectedDayRows = useMemo(() => {
+    if (!selectedDay) return []
+    const d = typeof selectedDay === 'string' ? parseISO(selectedDay) : selectedDay
+    return displayRows.filter((r) => r.date && isSameDay(r.date, d))
+  }, [selectedDay, displayRows])
 
   const runAnalysis = () => setHasAnalyzed(true)
 
@@ -121,20 +158,24 @@ export default function App() {
     doc.autoTable({
       startY: 110,
       head: [['Location', 'Count', 'Total cost']],
-      body: topLocations.map((l) => [l.location, String(l.count), `$${l.total.toFixed(2)}`]),
+      body: topLocations.map((l) => [
+        getPlazaDisplayName(l.location),
+        String(l.count),
+        `$${l.total.toFixed(2)}`,
+      ]),
       theme: 'grid',
       headStyles: { fillColor: [15, 148, 136] },
     })
 
     let y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 110
     doc.setFontSize(14)
-    doc.text('By vehicle / transponder', 40, y)
+    doc.text('By vehicle', 40, y)
     y += 12
     doc.autoTable({
       startY: y,
       head: [['Vehicle', 'Total', 'Count', '%']],
-      body: byVehicle.map((v) => [
-        v.name,
+      body: byVehicleWithLabels.map((v) => [
+        v.displayName,
         `$${v.total.toFixed(2)}`,
         String(v.count),
         `${v.percent.toFixed(1)}%`,
@@ -276,7 +317,7 @@ export default function App() {
 
             {dailyTrend.length > 0 && (
               <div className="chart-block">
-                <h3 className="chart-title">Daily expense trend</h3>
+                <h3 className="chart-title">Daily expense trend (click a point for details)</h3>
                 <div className="chart-wrap chart-line">
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={dailyTrend} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -300,32 +341,81 @@ export default function App() {
                         dataKey="total"
                         stroke="var(--accent)"
                         strokeWidth={2}
-                        dot={{ fill: 'var(--accent)', r: 3 }}
+                        dot={<DailyTrendDot onClick={setSelectedDay} />}
+                        activeDot={{ r: 8, stroke: 'var(--accent-hover)', strokeWidth: 2 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                {selectedDay && (
+                  <div className="day-details-panel">
+                    <div className="day-details-header">
+                      <h4>Transactions for {format(parseISO(selectedDay), 'EEEE, MMM d, yyyy')}</h4>
+                      <button
+                        type="button"
+                        className="btn-close-details"
+                        onClick={() => setSelectedDay(null)}
+                        aria-label="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="day-details-table-wrap">
+                      <table className="data-table day-details-table">
+                        <thead>
+                          <tr>
+                            <th>Time</th>
+                            <th>Location</th>
+                            <th>Vehicle</th>
+                            <th>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedDayRows
+                            .sort((a, b) => (a.exitDate || a.date) - (b.exitDate || b.date))
+                            .map((r, i) => (
+                              <tr key={i}>
+                                <td>
+                                  {r.exitDate
+                                    ? format(r.exitDate, 'h:mm a')
+                                    : r.date
+                                      ? format(r.date, 'h:mm a')
+                                      : '—'}
+                                </td>
+                                <td>{getPlazaDisplayName(r.exitInterchange)}</td>
+                                <td>{vehicleDisplayNames.get(r.transponder?.trim() ?? '') ?? 'Unassigned'}</td>
+                                <td>${r.amount.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="day-details-summary">
+                      {selectedDayRows.length} transaction(s) · ${selectedDayRows.reduce((s, r) => s + r.amount, 0).toFixed(2)} total
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {byVehicle.length > 0 && (
+            {byVehicleWithLabels.length > 0 && (
               <div className="chart-block">
                 <h3 className="chart-title">Expenses by vehicle</h3>
                 <div className="chart-wrap chart-pie">
                   <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie
-                        data={byVehicle}
+                        data={byVehicleWithLabels}
                         dataKey="total"
-                        nameKey="name"
+                        nameKey="displayName"
                         cx="50%"
                         cy="50%"
                         outerRadius="70%"
-                        label={({ name, percent }) =>
-                          `${name.length > 12 ? name.slice(0, 10) + '…' : name} ${(percent * 100).toFixed(0)}%`
+                        label={({ displayName, percent }) =>
+                          `${displayName} ${(percent * 100).toFixed(0)}%`
                         }
                       >
-                        {byVehicle.map((_, i) => (
+                        {byVehicleWithLabels.map((_, i) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                         ))}
                       </Pie>
@@ -352,7 +442,12 @@ export default function App() {
                     <tbody>
                       {topLocations.map((row, i) => (
                         <tr key={i}>
-                          <td>{row.location}</td>
+                          <td>
+                            <span className="plaza-name">{getPlazaDisplayName(row.location)}</span>
+                            {row.location !== getPlazaDisplayName(row.location) && (
+                              <span className="plaza-code">{row.location}</span>
+                            )}
+                          </td>
                           <td>{row.count}</td>
                           <td>${row.total.toFixed(2)}</td>
                         </tr>
