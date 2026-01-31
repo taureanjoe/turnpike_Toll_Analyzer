@@ -40,6 +40,7 @@
     grid-template-columns: 340px 1fr;
     gap: 1.5rem;
     align-items: start;
+    min-height: 0; /* allow grid to shrink so page can scroll */
   }
 }
 
@@ -59,11 +60,7 @@
   color: var(--text);
 }
 
-/* Upload */
-.upload-card {
-  position: sticky;
-  top: 1.5rem;
-}
+/* Upload – scrolls with the page (no sticky) */
 
 .upload-zone {
   border: 2px dashed var(--border);
