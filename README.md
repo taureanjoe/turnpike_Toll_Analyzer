@@ -28,6 +28,17 @@ npm run build
 npm run preview   # optional: preview production build
 ```
 
+## Deploy to GitHub Pages
+
+The repo is set up to deploy the **main** branch to GitHub Pages.
+
+1. **Enable GitHub Pages:** In your repo on GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+2. **Push main:** Push the `main` branch (or merge your branch into `main` and push). The workflow **Deploy to GitHub Pages** will build and deploy the app.
+3. **Live URL:** After the workflow completes, the app is available at  
+   **https://taureanjoe.github.io/turnpike_Toll_Analyzer/**
+
+The Vite `base` is set to `/turnpike_Toll_Analyzer/` so assets load correctly on GitHub Pages. If you rename the repo, update `base` in `vite.config.js` to match (e.g. `'/NewRepoName/'`).
+
 ## File format (CSV or Excel)
 
 Accepted: **.csv**, **.xlsx**, **.xls**. For Excel, the **first sheet** is read. The app expects at least an **Amount** column. For richer analysis it uses:
