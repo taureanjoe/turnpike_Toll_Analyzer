@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { parseTurnpikeCsv } from './utils/csvParser'
+import { parseTurnpikeXlsx } from './utils/xlsxParser'
 import {
   filterByTimePeriod,
   dailyExpenseTrend,
@@ -55,25 +56,37 @@ export default function App() {
     setRows([])
     setHasAnalyzed(false)
     if (!f) return
-    if (!f.name.toLowerCase().endsWith('.csv')) {
-      setParseError('Please select a CSV file.')
+    const isCsv = f.name.toLowerCase().endsWith('.csv')
+    const isXlsx = f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls')
+    if (!isCsv && !isXlsx) {
+      setParseError('Please select a CSV or Excel (.xlsx, .xls) file.')
       return
     }
     setFileName(f.name)
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const text = ev.target?.result ?? ''
-        const parsed = parseTurnpikeCsv(text)
+        let parsed
+        if (isCsv) {
+          const text = ev.target?.result ?? ''
+          parsed = parseTurnpikeCsv(text)
+        } else {
+          const arrayBuffer = ev.target?.result
+          parsed = parseTurnpikeXlsx(arrayBuffer)
+        }
         setRows(parsed)
         setFile(f)
         setParseError('')
       } catch (err) {
-        setParseError(err.message || 'Failed to parse CSV')
+        setParseError(err.message || 'Failed to parse file')
         setRows([])
       }
     }
-    reader.readAsText(f, 'UTF-8')
+    if (isCsv) {
+      reader.readAsText(f, 'UTF-8')
+    } else {
+      reader.readAsArrayBuffer(f)
+    }
   }
 
   const filteredRows = useMemo(() => {
@@ -153,14 +166,14 @@ export default function App() {
             <input
               id="csv-input"
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileChange}
               className="upload-input"
             />
             <div className="upload-content">
               <span className="upload-icon">↑</span>
               <span className="upload-label">
-                {fileName ? fileName : 'Upload CSV file'}
+                {fileName ? fileName : 'Upload CSV or Excel file'}
               </span>
             </div>
           </div>
