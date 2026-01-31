@@ -19,10 +19,74 @@
   letter-spacing: -0.02em;
 }
 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
 .header-date {
-  margin: 0.25rem 0 0;
+  margin: 0;
   font-size: 0.875rem;
   opacity: 0.85;
+}
+
+.header-privacy-link {
+  padding: 0;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.75);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.header-privacy-link:hover {
+  color: #fff;
+}
+
+/* Privacy notice modal */
+.privacy-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.privacy-modal {
+  max-width: 420px;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+}
+
+.privacy-modal h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.privacy-modal p {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.privacy-modal .btn {
+  width: 100%;
+  margin-top: 0;
 }
 
 /* Main layout */

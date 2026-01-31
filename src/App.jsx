@@ -118,6 +118,7 @@ export default function App() {
   const [graphDateRange, setGraphDateRange] = useState(null)
   const [brushKey, setBrushKey] = useState(0)
   const [expandedLocation, setExpandedLocation] = useState(null)
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(false)
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0]
@@ -288,8 +289,37 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1 className="header-title">TollWatch Toll Expense Analyzer</h1>
-        <p className="header-date">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+        <div className="header-meta">
+          <p className="header-date">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <button
+            type="button"
+            className="header-privacy-link"
+            onClick={() => setShowPrivacyNotice(true)}
+          >
+            Privacy
+          </button>
+        </div>
       </header>
+      {showPrivacyNotice && (
+        <div className="privacy-overlay" onClick={() => setShowPrivacyNotice(false)}>
+          <div className="privacy-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Privacy notice</h3>
+            <p>
+              Your data is not used, stored, or sent anywhere. Files you upload are only read in your
+              browser to run the analysis and are not saved. We do not collect, transmit, or retain any
+              of your toll data—it is viewed and discarded immediately. When you leave or refresh the
+              page, the data is gone.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowPrivacyNotice(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="main">
         <section className="card upload-card">
