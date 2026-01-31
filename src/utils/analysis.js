@@ -128,3 +128,67 @@ export function topTollLocations(rows, limit = 10) {
     .sort((a, b) => b.total - a.total)
     .slice(0, limit)
 }
+
+/**
+ * Toll location breakdown for a subset of rows (e.g. one day). Same shape as topTollLocations.
+ */
+export function locationBreakdown(rows, limit = 20) {
+  return topTollLocations(rows, limit)
+}
+
+/**
+ * Travel behavior summary: total trips, weeks in period, avg weekly trips, top locations text.
+ */
+export function travelBehaviorSummary(rows, period, periodDate, startDate, endDate) {
+  const totalTrips = rows.length
+  if (totalTrips === 0) {
+    return { totalTrips: 0, weeksInPeriod: 0, avgWeeklyTrips: 0, topLocationNames: [], weekdayCounts: null }
+  }
+
+  const dateRows = rows.filter((r) => r.date && isValid(r.date))
+  let weeksInPeriod = 0
+  if (period === 'custom' && startDate && endDate) {
+    const start = startOfDay(new Date(startDate))
+    const end = endOfDay(new Date(endDate))
+    weeksInPeriod = Math.max(0.5, (end - start) / (7 * 24 * 60 * 60 * 1000))
+  } else if (period === 'month' && periodDate) {
+    const d = new Date(periodDate)
+    weeksInPeriod = (endOfMonth(d) - startOfMonth(d)) / (7 * 24 * 60 * 60 * 1000) + 1 / 7
+  } else if (period === 'quarter' && periodDate) {
+    const d = new Date(periodDate)
+    weeksInPeriod = (endOfQuarter(d) - startOfQuarter(d)) / (7 * 24 * 60 * 60 * 1000) + 1 / 7
+  } else if (period === 'year' && periodDate) {
+    const d = new Date(periodDate)
+    weeksInPeriod = (endOfYear(d) - startOfYear(d)) / (7 * 24 * 60 * 60 * 1000) + 1 / 7
+  } else if (dateRows.length >= 2) {
+    const min = new Date(Math.min(...dateRows.map((r) => r.date.getTime())))
+    const max = new Date(Math.max(...dateRows.map((r) => r.date.getTime())))
+    weeksInPeriod = Math.max(0.5, (max - min) / (7 * 24 * 60 * 60 * 1000) + 1 / 7)
+  } else {
+    weeksInPeriod = 1
+  }
+
+  const avgWeeklyTrips = weeksInPeriod > 0 ? totalTrips / weeksInPeriod : totalTrips
+  const topLocs = topTollLocations(rows, 5)
+  const topLocationNames = topLocs.map((l) => l.location)
+
+  const weekdayCounts = dateRows.length
+    ? (() => {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        const byDay = new Map(dayNames.map((d) => [d, 0]))
+        dateRows.forEach((r) => {
+          const day = dayNames[r.date.getDay()]
+          byDay.set(day, (byDay.get(day) ?? 0) + 1)
+        })
+        return Object.fromEntries(byDay)
+      })()
+    : null
+
+  return {
+    totalTrips,
+    weeksInPeriod,
+    avgWeeklyTrips,
+    topLocationNames,
+    weekdayCounts,
+  }
+}
